@@ -1,0 +1,8 @@
+print ('ORINOCO - SHOPPER MAIN MENU')
+print('_______________________________')
+print('\n 1. Display your order history')
+print('\n 2. Add an item to your basket')
+print('\n 3. View your basket')
+print('\n 4. Checkout')
+print('\n 5. Exit \n')
+choice = int(input('Choose one of the options: \n'))
