@@ -2,26 +2,108 @@
 import sqlite3
 import datetime
 
-def _display_options(all_options,title,type):
-    option_num = 1
-    option_list = []
-    print("\n",title,"\n")
-    for option in all_options:
-        code = option[0]
-        desc = option[1]
-        print("{0}.\t{1}".format(option_num, desc))
-        option_num = option_num + 1
-        option_list.append(code)
-    selected_option = 0
-    while selected_option > len(option_list) or selected_option == 0:
-        prompt = "Enter the number against the "+type+" you want to choose: "
-        selected_option = int(input(prompt))
-    return option_list[selected_option - 1]
-
-
 db= sqlite3.connect('/Users/kat/OneDrive - Solent University/database assignment/part_1.db')
-
 cursor= db.cursor()
+
+
+def manage_product (choice_cat):
+    sql_query = "select p.category_id,p.product_id, p.product_description, p.product_status\
+                from products p\
+                where category_id = ? AND product_status IS \'Available'\
+                order by p.category_id"
+    cursor.execute(sql_query, (choice_cat,))
+    all_choice_cat_rows = cursor.fetchall()
+    if all_choice_cat_rows:
+        print("Category ID\tProduct ID\tProduct Description\t\t\t     Product Status\n")
+        for choice_cat_row in all_choice_cat_rows:
+            category_id = choice_cat_row[0]
+            product_id = choice_cat_row[1]
+            product_description = choice_cat_row[2]
+            product_status = choice_cat_row[3]
+            print("{0:8}\t{1:10}\t{2:45}{3:20}"\
+            .format(category_id,product_id,product_description, product_status))
+        choice_buy =int(input("\nEnter the ID of the product you would like to purchase:\n"))
+        #selecting a product to buy
+        sql_query = "SELECT ps.seller_id, s.seller_name, ps.price\
+                    FROM product_sellers ps\
+                        inner join sellers s ON ps.seller_id= s.seller_id\
+                    where ps.product_id = ?\
+                    order by s.seller_name"
+        cursor.execute(sql_query, (choice_buy,))
+        all_choice_buy_rows = cursor.fetchall()
+        if all_choice_buy_rows:
+            print("\nSeller ID\tSeller Name\t    Price\n")
+            for choice_buy_row in all_choice_buy_rows:
+                seller_id = choice_buy_row[0]
+                seller_name = choice_buy_row[1]
+                price = choice_buy_row[2]
+                print("{0:8}\t{1:15}\t{2:10.2f}"\
+                .format(seller_id,seller_name,price))
+            #selecting a seller to buy from
+            choice_seller =int(input("\nEnter the ID of the seller you would like to purchase from:\n"))
+            sql_query = "select ps.price, ps.seller_id, ps.product_id\
+                            from product_sellers ps\
+                            where ps.seller_id =? and ps.product_id=?"
+            cursor.execute(sql_query, (choice_seller, choice_buy))
+            choice_price_row = cursor.fetchone()
+            choice_price = choice_price_row[0]
+            choice_qty =int(input("\nEnter the quantity you would like to purchase:\n"))
+            print("Product " +str(choice_buy) + " from the seller " + str(choice_seller) +" at a price " +str(choice_price)+". Quantity: " + str(choice_qty))
+            add_to_basket = int(input("\nAdd to basket? Press 1. for Yes, 2. for No.\n"))
+            if add_to_basket == 1:
+                try:
+                    
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                    cursor.execute("select basket_id\
+                    from shopper_baskets\
+                    where shopper_id= ?",(shopper_id,))
+        
+                    active_basket= cursor.fetchone()
+                    
+                    
+                    if active_basket:
+                        active_basket_id= active_basket[0]
+                        #if the user has an active basket, use it to add new products
+                        sql_insert = "INSERT INTO basket_contents(basket_id, product_id, seller_id, quantity, price)\
+                                    VALUES(?,?,?,?,?)"
+                        cursor.execute(sql_insert,(active_basket_id, choice_buy, choice_seller, choice_qty, choice_price))
+                        print("\nAdded to basket.\n")
+                        db.commit()
+                        print("\nGoing back to the main menu...\n")
+                    else:
+                    #create a new basket ID
+                        cursor.execute("select seq + 1 \
+                            from sqlite_sequence \
+                            WHERE name = 'shopper_baskets'")
+                        seg_row = cursor.fetchone()
+                        next_basket_id = seg_row[0]
+                        now=datetime.datetime.now()
+                        todays_date = now.strftime("%d-%m-%Y")
+                        sql_insert = "INSERT INTO shopper_baskets(basket_id,shopper_id, basket_created_date_time)\
+                                    VALUES (?,?,?)"
+                        cursor.execute(sql_insert,(next_basket_id,shopper_id, todays_date))
+                        print("\nAdded to basket.\n")
+                        db.commit()
+                        print("\nGoing back to the main menu...\n")
+                    run== False
+                except db.Error:
+                    print("\nSomething went wrong, rolling back changes...\n")
+                    db.rollback()
+            elif add_to_basket == 2:
+                print("\nYou didn't add to the basket. Loading main menu...\n\n")
+                run == False
+            else:
+                    print("\nInvlid entry. Loading main menu....\n\n")
+                    run == False
+
+        else:
+            print("\nNo sellers sell this product. Loading main menu... \n\n")
+            run == False
+    else:
+        print("\nNo products available. Loading main menu... \n\n")
+        run == False
+
+
 run= True
 customer = True 
 
@@ -102,526 +184,81 @@ while run:
         #selecting  a category
         if choice_cat == 1:
             print("\nCATEGORY: Mobile phones and accessories:\n")
-            sql_query = "select p.category_id,p.product_id, p.product_description, p.product_status\
-                        from products p\
-                        where category_id = ? AND product_status IS \'Available'\
-                        order by p.category_id"
-            cursor.execute(sql_query, (choice_cat,))
-            all_choice_cat_rows = cursor.fetchall()
-            if all_choice_cat_rows:
-                print("Category ID\tProduct ID\tProduct Description\t\t\t     Product Status\n")
-                for choice_cat_row in all_choice_cat_rows:
-                    category_id = choice_cat_row[0]
-                    product_id = choice_cat_row[1]
-                    product_description = choice_cat_row[2]
-                    product_status = choice_cat_row[3]
-                    print("{0:8}\t{1:10}\t{2:45}{3:20}"\
-                    .format(category_id,product_id,product_description, product_status))
-                choice_buy =int(input("\nEnter the ID of the product you would like to purchase:\n"))
-                #selecting a product to buy
-                sql_query = "SELECT ps.seller_id, s.seller_name, ps.price\
-                            FROM product_sellers ps\
-                                inner join sellers s ON ps.seller_id= s.seller_id\
-                            where ps.product_id = ?\
-                            order by s.seller_name"
-                cursor.execute(sql_query, (choice_buy,))
-                all_choice_buy_rows = cursor.fetchall()
-                if all_choice_buy_rows:
-                    print("\nSeller ID\tSeller Name\t    Price\n")
-                    for choice_buy_row in all_choice_buy_rows:
-                        seller_id = choice_buy_row[0]
-                        seller_name = choice_buy_row[1]
-                        price = choice_buy_row[2]
-                        print("{0:8}\t{1:15}\t{2:10.2f}"\
-                        .format(seller_id,seller_name,price))
-                    #selecting a seller to buy from
-                    choice_seller =int(input("\nEnter the ID of the seller you would like to purchase from:\n"))
-                    sql_query = "select ps.price, ps.seller_id, ps.product_id\
-                                    from product_sellers ps\
-                                    where ps.seller_id =? and ps.product_id=?"
-                    cursor.execute(sql_query, (choice_seller, choice_buy))
-                    choice_price_row = cursor.fetchone()
-                    choice_price = choice_price_row[0]
-                    choice_qty =int(input("\nEnter the quantity you would like to purchase:\n"))
-                    print("Product " +str(choice_buy) + " from the seller " + str(choice_seller) +" at a price " +str(choice_price)+". Quantity: " + str(choice_qty))
-                    add_to_basket = int(input("\nAdd to basket? Press 1. for Yes, 2. for No.\n"))
-                    if add_to_basket == 1:
-                        try:
-                            cursor.execute("PRAGMA foreign_keys=ON")
-                            cursor.execute("select seq + 1 \
-                                from sqlite_sequence \
-                                WHERE name = 'shopper_baskets'")
-                            seg_row = cursor.fetchone()
-                            next_basket_id = seg_row[0]
-                            now=datetime.datetime.now()
-                            todays_date = now.strftime("%d-%m-%Y")
-                            sql_insert = "INSERT INTO shopper_baskets(basket_id,shopper_id, basket_created_date_time)\
-                                        VALUES (?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id,shopper_id, todays_date))
-                            cursor.execute("select basket_id\
-                                            from shopper_baskets\
-                                            where shopper_id = ?")
-                            basket_row = cursor.fetchone()
-                            choose_basket_row = basket_row[0]
-                            sql_insert = "INSERT INTO basket_contents(basket_id, product_id, seller_id, quantity, price)\
-                                        VALUES( choose_basket_row,?,?,?,?)"
-                            cursor.execute(sql_insert,(choose_basket_row, choice_buy, choice_seller, choice_qty, choice_price))
-                            print("\nAdded to basket.\n")
-                            db.commit()
-                            print("\nGoing back to the main menu...\n")
-                            run== False
-                        except db.Error:
-                            print("\nSomething went wrong, rolling back changes...\n")
-                            db.rollback()
-                    elif add_to_basket == 2:
-                        print("\nYou didn't add to the basket. Loading main menu...\n\n")
-                        run == False
-                    else:
-                         print("\nInvlid entry. Loading main menu....\n\n")
-                         run == False
-
-                else:
-                    print("\nNo sellers sell this product. Loading main menu... \n\n")
-                    run == False
-            else:
-                print("\nNo products available. Loading main menu... \n\n")
-                run == False
-
+            manage_product(choice_cat)
+    
         elif choice_cat == 2:
             print("\nCATEGORY: TV and Home Cinema:\n")
-            sql_query = "select p.category_id, p.product_id, p.product_description, p.product_status\
-                        from products p\
-                        where category_id = ? AND product_status IS \'Available'\
-                        order by p.category_id"
-            cursor.execute(sql_query, (choice_cat,))
-            all_choice_cat_rows = cursor.fetchall()
-            if all_choice_cat_rows:
-                print("Category ID\tProduct ID\tProduct Description\t\t\t\tProduct Status\n")
-                for choice_cat_row in all_choice_cat_rows:
-                    category_id = choice_cat_row[0]
-                    product_id = choice_cat_row[1]
-                    product_description = choice_cat_row[2]
-                    product_status = choice_cat_row[3]
-                    print("{0:8}\t{1:10}\t{2:40}\t{3:20}"\
-                    .format(category_id,product_id,product_description, product_status))
-                choice_buy =int(input("\nEnter the ID of the product you would like to purchase:\n"))
-                #selecting a product to buy
-                sql_query = "SELECT ps.seller_id, s.seller_name, ps.price\
-                            FROM product_sellers ps\
-                                inner join sellers s ON ps.seller_id= s.seller_id\
-                            where ps.product_id = ?\
-                            order by s.seller_name"
-                cursor.execute(sql_query, (choice_buy,))
-                all_choice_buy_rows = cursor.fetchall()
-                if all_choice_buy_rows:
-                    print("\nSeller ID\tSeller Name\t    Price\n")
-                    for choice_buy_row in all_choice_buy_rows:
-                        seller_id = choice_buy_row[0]
-                        seller_name = choice_buy_row[1]
-                        price = choice_buy_row[2]
-                        print("{0:8}\t{1:15}\t{2:10.2f}"\
-                        .format(seller_id,seller_name,price))
-                    #selecting a seller to buy from
-                    choice_seller =int(input("\nEnter the ID of the seller you would like to purchase from:\n"))
-                    sql_query = "select ps.price, ps.seller_id, ps.product_id\
-                                    from product_sellers ps\
-                                    where ps.seller_id =? and ps.product_id=?"
-                    cursor.execute(sql_query, (choice_seller, choice_buy))
-                    choice_price_row = cursor.fetchone()
-                    choice_price = choice_price_row[0]
-                    choice_qty =int(input("\nEnter the quantity you would like to purchase:\n"))
-                    print("Product " +str(choice_buy) + " from the seller " + str(choice_seller) +" at a price " +str(choice_price)+". Quantity: " + str(choice_qty))
-                    add_to_basket = int(input("\nAdd to basket? Press 1. for Yes, 2. for No.\n"))
-                    if add_to_basket == 1:
-                        try:
-                            cursor.execute("PRAGMA foreign_keys=ON")
-                            cursor.execute("select seq + 1 \
-                                from sqlite_sequence \
-                                WHERE name = 'shopper_baskets'")
-                            seg_row = cursor.fetchone()
-                            next_basket_id = seg_row[0]
-                            now=datetime.datetime.now()
-                            todays_date = now.strftime("%d-%m-%Y")
-                            sql_insert = "INSERT INTO shopper_baskets(basket_id,shopper_id, basket_created_date_time)\
-                                        VALUES (?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id,shopper_id, todays_date))
-                            sql_insert = "INSERT INTO basket_contents(basket_id, product_id, seller_id, quantity, price)\
-                                        VALUES( ?,?,?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id, choice_buy, choice_seller, choice_qty, choice_price))
-                            print("\nAdded to basket.\n")
-                            db.commit()
-                            print("\nGoing back to the main menu...\n")
-                            run== False
-                        except db.Error:
-                            print("Something went wrong, rolling back changes")
-                            db.rollback()
-                    elif add_to_basket == 2:
-                        print("\nYou didn't add to the basket. Loading main menu...\n\n")
-                        run == False
-                    else:
-                         print("\nInvlid entry. Loading main menu....\n\n")
-                         run == False
-
-                else:
-                    print("\nNo sellers sell this product. Loading main menu... \n\n")
-                    run == False
-            else:
-                print("\nNo products available. Loading main menu... \n\n")
-                run == False
-
+            manage_product(choice_cat)
+            
         elif choice_cat == 3:
             print("\nCATEGORY: Cameras and accessories:\n")
-            sql_query = "select p.category_id,p.product_id, p.product_description, p.product_status\
-                        from products p\
-                        where category_id = ? AND product_status IS \'Available'\
-                        order by p.category_id"
-            cursor.execute(sql_query, (choice_cat,))
-            all_choice_cat_rows = cursor.fetchall()
-            if all_choice_cat_rows:
-                print("Category ID\tProduct ID\tProduct Description\t\t\t\tProduct Status\n")
-                for choice_cat_row in all_choice_cat_rows:
-                    category_id = choice_cat_row[0]
-                    product_id = choice_cat_row[1]
-                    product_description = choice_cat_row[2]
-                    product_status = choice_cat_row[3]
-                    print("{0:8}\t{1:10}\t{2:40}\t{3:10}"\
-                    .format(category_id,product_id, product_description, product_status))
-                choice_buy =int(input("\nEnter the ID of the product you would like to purchase:\n"))
-                #selecting a product to buy
-                sql_query = "SELECT ps.seller_id, s.seller_name, ps.price\
-                            FROM product_sellers ps\
-                                inner join sellers s ON ps.seller_id= s.seller_id\
-                            where ps.product_id = ?\
-                            order by s.seller_name"
-                cursor.execute(sql_query, (choice_buy,))
-                all_choice_buy_rows = cursor.fetchall()
-                if all_choice_buy_rows:
-                    print("\nSeller ID\tSeller Name\t    Price\n")
-                    for choice_buy_row in all_choice_buy_rows:
-                        seller_id = choice_buy_row[0]
-                        seller_name = choice_buy_row[1]
-                        price = choice_buy_row[2]
-                        print("{0:8}\t{1:15}\t{2:10.2f}"\
-                        .format(seller_id,seller_name,price))
-                    #selecting a seller to buy from
-                    choice_seller =int(input("\nEnter the ID of the seller you would like to purchase from:\n"))
-                    sql_query = "select ps.price, ps.seller_id, ps.product_id\
-                                    from product_sellers ps\
-                                    where ps.seller_id =? and ps.product_id=?"
-                    cursor.execute(sql_query, (choice_seller, choice_buy))
-                    choice_price_row = cursor.fetchone()
-                    choice_price = choice_price_row[0]
-                    choice_qty =int(input("\nEnter the quantity you would like to purchase:\n"))
-                    print("Product " +str(choice_buy) + " from the seller " + str(choice_seller) +" at a price " +str(choice_price)+". Quantity: " + str(choice_qty))
-                    add_to_basket = int(input("\nAdd to basket? Press 1. for Yes, 2. for No.\n"))
-                    if add_to_basket == 1:
-                        try:
-                            cursor.execute("PRAGMA foreign_keys=ON")
-                            cursor.execute("select seq + 1 \
-                                from sqlite_sequence \
-                                WHERE name = 'shopper_baskets'")
-                            seg_row = cursor.fetchone()
-                            next_basket_id = seg_row[0]
-                            now=datetime.datetime.now()
-                            todays_date = now.strftime("%d-%m-%Y")
-                            sql_insert = "INSERT INTO shopper_baskets(basket_id,shopper_id, basket_created_date_time)\
-                                        VALUES (?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id,shopper_id, todays_date))
-                            sql_insert = "INSERT INTO basket_contents(basket_id, product_id, seller_id, quantity, price)\
-                                        VALUES( ?,?,?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id, choice_buy, choice_seller, choice_qty, choice_price))
-                            print("\nAdded to basket.\n")
-                            db.commit()
-                            print("\nGoing back to the main menu...\n")
-                            run== False
-                        except db.Error:
-                            print("Something went wrong, rolling back changes")
-                            db.rollback()
-                    elif add_to_basket == 2:
-                        print("\nYou didn't add to the basket. Loading main menu...\n\n")
-                        run == False
-                    else:
-                         print("\nInvlid entry. Loading main menu....\n\n")
-                         run == False
-
-                else:
-                    print("\nNo sellers sell this product. Loading main menu... \n\n")
-                    run == False
-            else:
-                print("\nNo products available. Loading main menu... \n\n")
-                run == False
+            manage_product(choice_cat)
 
         elif choice_cat == 4:
             print("\nCATEGORY: Audio and Hifi:\n")
-            sql_query = "select p.category_id, p.product_id, p.product_description, p.product_status\
-                        from products p\
-                        where category_id = ? AND product_status IS \'Available'\
-                        order by p.category_id"
-            cursor.execute(sql_query, (choice_cat,))
-            all_choice_cat_rows = cursor.fetchall()
-            if all_choice_cat_rows:
-                print("Category ID\tProduct ID\tProduct Description\t\t\t\t\t\tProduct Status\n")
-                for choice_cat_row in all_choice_cat_rows:
-                    category_id = choice_cat_row[0]
-                    product_id = choice_cat_row[1]
-                    product_description = choice_cat_row[2]
-                    product_status = choice_cat_row[3]
-                    print("{0:8}\t{1:10}\t{2:60}\t{3:10}"\
-                    .format(category_id,product_id,product_description, product_status))
-                choice_buy =int(input("\nEnter the ID of the product you would like to purchase:\n"))
-                #selecting a product to buy
-                sql_query = "SELECT ps.seller_id, s.seller_name, ps.price\
-                            FROM product_sellers ps\
-                                inner join sellers s ON ps.seller_id= s.seller_id\
-                            where ps.product_id = ?\
-                            order by s.seller_name"
-                cursor.execute(sql_query, (choice_buy,))
-                all_choice_buy_rows = cursor.fetchall()
-                if all_choice_buy_rows:
-                    print("\nSeller ID\tSeller Name\t    Price\n")
-                    for choice_buy_row in all_choice_buy_rows:
-                        seller_id = choice_buy_row[0]
-                        seller_name = choice_buy_row[1]
-                        price = choice_buy_row[2]
-                        print("{0:8}\t{1:15}\t{2:10.2f}"\
-                        .format(seller_id,seller_name,price))
-                    #selecting a seller to buy from
-                    choice_seller =int(input("\nEnter the ID of the seller you would like to purchase from:\n"))
-                    sql_query = "select ps.price, ps.seller_id, ps.product_id\
-                                    from product_sellers ps\
-                                    where ps.seller_id =? and ps.product_id=?"
-                    cursor.execute(sql_query, (choice_seller, choice_buy))
-                    choice_price_row = cursor.fetchone()
-                    choice_price = choice_price_row[0]
-                    choice_qty =int(input("\nEnter the quantity you would like to purchase:\n"))
-                    print("Product " +str(choice_buy) + " from the seller " + str(choice_seller) +" at a price " +str(choice_price)+". Quantity: " + str(choice_qty))
-                    add_to_basket = int(input("\nAdd to basket? Press 1. for Yes, 2. for No.\n"))
-                    if add_to_basket == 1:
-                        try:
-                            cursor.execute("PRAGMA foreign_keys=ON")
-                            cursor.execute("select seq + 1 \
-                                from sqlite_sequence \
-                                WHERE name = 'shopper_baskets'")
-                            seg_row = cursor.fetchone()
-                            next_basket_id = seg_row[0]
-                            now=datetime.datetime.now()
-                            todays_date = now.strftime("%d-%m-%Y")
-                            sql_insert = "INSERT INTO shopper_baskets(basket_id,shopper_id, basket_created_date_time)\
-                                        VALUES (?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id,shopper_id, todays_date))
-                            sql_insert = "INSERT INTO basket_contents(basket_id, product_id, seller_id, quantity, price)\
-                                        VALUES( ?,?,?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id, choice_buy, choice_seller, choice_qty, choice_price))
-                            print("\nAdded to basket.\n")
-                            db.commit()
-                            print("\nGoing back to the main menu...\n")
-                            run== False
-                        except db.Error:
-                            print("Something went wrong, rolling back changes")
-                            db.rollback()
-                    elif add_to_basket == 2:
-                        print("\nYou didn't add to the basket. Loading main menu...\n\n")
-                        run == False
-                    else:
-                         print("\nInvlid entry. Loading main menu....\n\n")
-                         run == False
-
-                else:
-                    print("\nNo sellers sell this product. Loading main menu... \n\n")
-                    run == False
-            else:
-                print("\nNo products available. Loading main menu... \n\n")
-                run == False
+            manage_product(choice_cat)
             
         elif choice_cat == 5:
             print("\nCATEGORY: Computers and accessories:\n")
-            sql_query = "select p.category_id, p.product_id, p.product_description, p.product_status\
-                        from products p\
-                        where category_id = ? AND product_status IS \'Available'\
-                        order by p.category_id"
-            cursor.execute(sql_query, (choice_cat,))
-            all_choice_cat_rows = cursor.fetchall()
-            if all_choice_cat_rows:
-                print("Category ID\tProduct ID\tProduct Description\t\t\t\t\t\t\tProduct Status\n")
-                for choice_cat_row in all_choice_cat_rows:
-                    category_id = choice_cat_row[0]
-                    product_id = choice_cat_row[1]
-                    product_description = choice_cat_row[2]
-                    product_status = choice_cat_row[3]
-                    print("{0:8}\t{1:10}\t{2:70}\t{3:10}"\
-                    .format(category_id,product_id,product_description, product_status))
-                choice_buy =int(input("\nEnter the ID of the product you would like to purchase:\n"))
-                #selecting a product to buy
-                sql_query = "SELECT ps.seller_id, s.seller_name, ps.price\
-                            FROM product_sellers ps\
-                                inner join sellers s ON ps.seller_id= s.seller_id\
-                            where ps.product_id = ?\
-                            order by s.seller_name"
-                cursor.execute(sql_query, (choice_buy,))
-                all_choice_buy_rows = cursor.fetchall()
-                if all_choice_buy_rows:
-                    print("\nSeller ID\tSeller Name\t    Price\n")
-                    for choice_buy_row in all_choice_buy_rows:
-                        seller_id = choice_buy_row[0]
-                        seller_name = choice_buy_row[1]
-                        price = choice_buy_row[2]
-                        print("{0:8}\t{1:15}\t{2:10.2f}"\
-                        .format(seller_id,seller_name,price))
-                    #selecting a seller to buy from
-                    choice_seller =int(input("\nEnter the ID of the seller you would like to purchase from:\n"))
-                    sql_query = "select ps.price, ps.seller_id, ps.product_id\
-                                    from product_sellers ps\
-                                    where ps.seller_id =? and ps.product_id=?"
-                    cursor.execute(sql_query, (choice_seller, choice_buy))
-                    choice_price_row = cursor.fetchone()
-                    choice_price = choice_price_row[0]
-                    choice_qty =int(input("\nEnter the quantity you would like to purchase:\n"))
-                    print("Product " +str(choice_buy) + " from the seller " + str(choice_seller) +" at a price " +str(choice_price)+". Quantity: " + str(choice_qty))
-                    add_to_basket = int(input("\nAdd to basket? Press 1. for Yes, 2. for No.\n"))
-                    if add_to_basket == 1:
-                        try:
-                            cursor.execute("PRAGMA foreign_keys=ON")
-                            cursor.execute("select seq + 1 \
-                                from sqlite_sequence \
-                                WHERE name = 'shopper_baskets'")
-                            seg_row = cursor.fetchone()
-                            next_basket_id = seg_row[0]
-                            now=datetime.datetime.now()
-                            todays_date = now.strftime("%d-%m-%Y")
-                            sql_insert = "INSERT INTO shopper_baskets(basket_id,shopper_id, basket_created_date_time)\
-                                        VALUES (?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id,shopper_id, todays_date))
-                            sql_insert = "INSERT INTO basket_contents(basket_id, product_id, seller_id, quantity, price)\
-                                        VALUES( ?,?,?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id, choice_buy, choice_seller, choice_qty, choice_price))
-                            print("\nAdded to basket.\n")
-                            db.commit()
-                            print("\nGoing back to the main menu...\n")
-                            run== False
-                        except db.Error:
-                            print("Something went wrong, rolling back changes")
-                            db.rollback()
-                    elif add_to_basket == 2:
-                        print("\nYou didn't add to the basket. Loading main menu...\n\n")
-                        run == False
-                    else:
-                         print("\nInvlid entry. Loading main menu....\n\n")
-                         run == False
-
-                else:
-                    print("\nNo sellers sell this product. Loading main menu... \n\n")
-                    run == False
-            else:
-                print("\nNo products available. Loading main menu... \n\n")
-                run == False
+            manage_product(choice_cat)
 
         elif choice_cat == 6:
             print("\nCATEGORY: Gaming:\n")
-            sql_query = "select p.category_id,p.product_id, p.product_description, p.product_status\
-                        from products p\
-                        where category_id = ? AND product_status IS \'Available'\
-                        order by p.category_id"
-            cursor.execute(sql_query, (choice_cat,))
-            all_choice_cat_rows = cursor.fetchall()
-            if all_choice_cat_rows:
-                print("Category ID\tProduct ID\tProduct Description\t\t\t\t\tProduct Status\n")
-                for choice_cat_row in all_choice_cat_rows:
-                    category_id = choice_cat_row[0]
-                    product_id = choice_cat_row[1]
-                    product_description = choice_cat_row[2]
-                    product_status = choice_cat_row[3]
-                    print("{0:8}\t{1:10}\t{2:50}\t{3:10}"\
-                    .format(category_id,product_id,product_description, product_status))
-                choice_buy =int(input("\nEnter the ID of the product you would like to purchase:\n"))
-                #selecting a product to buy
-                sql_query = "SELECT ps.seller_id, s.seller_name, ps.price\
-                            FROM product_sellers ps\
-                                inner join sellers s ON ps.seller_id= s.seller_id\
-                            where ps.product_id = ?\
-                            order by s.seller_name"
-                cursor.execute(sql_query, (choice_buy,))
-                all_choice_buy_rows = cursor.fetchall()
-                if all_choice_buy_rows:
-                    print("\nSeller ID\tSeller Name\t    Price\n")
-                    for choice_buy_row in all_choice_buy_rows:
-                        seller_id = choice_buy_row[0]
-                        seller_name = choice_buy_row[1]
-                        price = choice_buy_row[2]
-                        print("{0:8}\t{1:15}\t{2:10.2f}"\
-                        .format(seller_id,seller_name,price))
-                    #selecting a seller to buy from
-                    choice_seller =int(input("\nEnter the ID of the seller you would like to purchase from:\n"))
-                    sql_query = "select ps.price, ps.seller_id, ps.product_id\
-                                    from product_sellers ps\
-                                    where ps.seller_id =? and ps.product_id=?"
-                    cursor.execute(sql_query, (choice_seller, choice_buy))
-                    choice_price_row = cursor.fetchone()
-                    choice_price = choice_price_row[0]
-                    choice_qty =int(input("\nEnter the quantity you would like to purchase:\n"))
-                    print("Product " +str(choice_buy) + " from the seller " + str(choice_seller) +" at a price " +str(choice_price)+". Quantity: " + str(choice_qty))
-                    add_to_basket = int(input("\nAdd to basket? Press 1. for Yes, 2. for No.\n"))
-                    if add_to_basket == 1:
-                        try:
-                            cursor.execute("PRAGMA foreign_keys=ON")
-                            cursor.execute("select seq + 1 \
-                                from sqlite_sequence \
-                                WHERE name = 'shopper_baskets'")
-                            seg_row = cursor.fetchone()
-                            next_basket_id = seg_row[0]
-                            now=datetime.datetime.now()
-                            todays_date = now.strftime("%d-%m-%Y")
-                            sql_insert = "INSERT INTO shopper_baskets(basket_id,shopper_id, basket_created_date_time)\
-                                        VALUES (?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id,shopper_id, todays_date))
-                            sql_insert = "INSERT INTO basket_contents(basket_id, product_id, seller_id, quantity, price)\
-                                        VALUES( ?,?,?,?,?)"
-                            cursor.execute(sql_insert,(next_basket_id, choice_buy, choice_seller, choice_qty, choice_price))
-                            print("\nAdded to basket.\n")
-                            db.commit()
-                            print("\nGoing back to the main menu...\n")
-                            run== False
-                        except db.Error:
-                            print("Something went wrong, rolling back changes")
-                            db.rollback()
-                    elif add_to_basket == 2:
-                        print("\nYou didn't add to the basket. Loading main menu...\n\n")
-                        run == False
-                    else:
-                         print("\nInvlid entry. Loading main menu....\n\n")
-                         run == False
+            manage_product(choice_cat)
 
-                else:
-                    print("\nNo sellers sell this product. Loading main menu... \n\n")
-                    run == False
-            else:
-                print("\nNo products available. Loading main menu... \n\n")
-                run == False
-
+    #selecting 3.
     elif choice == 3:
-        print("Not done yet.")
+        print("Basket Contents:")
+        print("___________________\n")
+        #looking if there is an active basket for that user
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("select basket_id\
+                    from shopper_baskets\
+                    where shopper_id= ?",(shopper_id,))
+        active_basket= cursor.fetchone()
+                    
 
+        if active_basket:
+            active_basket_id= active_basket[0]
+            sql_query= "select p.product_description, s.seller_name, bc.quantity, bc.price\
+                    from basket_contents bc\
+                    left outer join product_sellers ps on bc.seller_id = ps.seller_id\
+                    left outer join products p on  ps.product_id= p.product_id\
+                    left outer join sellers s on ps.seller_id=s.seller_id\
+                    where basket_id = ?\
+                    group by product_description" 
+            cursor.execute(sql_query, (active_basket_id,))
+            all_basket_rows = cursor.fetchall()
+            if all_basket_rows:
+                print("Product Description\t\t\t\t\t\t\tSeller Name\t\tQty\t    Price\n")
+                for basket_row in all_basket_rows:
+                    product_description = basket_row[0]
+                    seller_name = basket_row[1]
+                    quantity = basket_row[2]
+                    price = basket_row[3]
+                    print("{0:70}\t{1:20}\t{2:4}\t{3:10}"\
+                        .format(product_description, seller_name, quantity, price))
+                if_continue= input("\nPress 1 to go back to the main menu:\n")
+                if if_continue == 1:
+                    run== False
+        else:
+            print("No orders yet.")
+            print("Going back to the main menu...\n")
+
+
+    #selecting 4.
     elif choice == 4:
         print("Not done yet")
 
+    #selecting 5
     elif choice == 5:
         exit= int(input("\nAre you sure you want to exit? \nclick 1. for yes 2. for no /n\n"))
         if exit == 1:
-            run == False
-        else:
-            print("Please select one of the available options.")
-            print ('ORINOCO - SHOPPER MAIN MENU')
-            print('_______________________________')
-            print('\n 1. Display your order history')
-            print('\n 2. Add an item to your basket')
-            print('\n 3. View your basket')
-            print('\n 4. Checkout')
-            print('\n 5. Exit \n')
-            choice = int(input('Choose one of the options: \n'))
-
-
+            run = False
+       
     else:
             print("\n\nInvalid entry. displaying menu...\n")
             print("\nPlease select one of the following options:\n")
            
-    
+#quit connection with the database
 db.close()
