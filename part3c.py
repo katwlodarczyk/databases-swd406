@@ -14,13 +14,13 @@ def manage_product (choice_cat):
     cursor.execute(sql_query, (choice_cat,))
     all_choice_cat_rows = cursor.fetchall()
     if all_choice_cat_rows:
-        print("Category ID\tProduct ID\tProduct Description\t\t\t     Product Status\n")
+        print("Category ID\tProduct ID\tProduct Description\t\t\t\t\t\tProduct Status\n")
         for choice_cat_row in all_choice_cat_rows:
             category_id = choice_cat_row[0]
             product_id = choice_cat_row[1]
             product_description = choice_cat_row[2]
             product_status = choice_cat_row[3]
-            print("{0:8}\t{1:10}\t{2:45}{3:20}"\
+            print("{0:8}\t{1:10}\t{2:60}\t{3:20}"\
             .format(category_id,product_id,product_description, product_status))
         choice_buy =int(input("\nEnter the ID of the product you would like to purchase:\n"))
         #selecting a product to buy
@@ -32,13 +32,13 @@ def manage_product (choice_cat):
         cursor.execute(sql_query, (choice_buy,))
         all_choice_buy_rows = cursor.fetchall()
         if all_choice_buy_rows:
-            print("\nSeller ID\tSeller Name\t    Price\n")
+            print("\nSeller ID\tSeller Name\t\tPrice\n")
             for choice_buy_row in all_choice_buy_rows:
                 seller_id = choice_buy_row[0]
                 seller_name = choice_buy_row[1]
                 price = choice_buy_row[2]
-                print("{0:8}\t{1:15}\t{2:10.2f}"\
-                .format(seller_id,seller_name,price))
+                print("{0:8}\t{1:15}\t\t£ {2:7.2f}"\
+                .format(seller_id,seller_name, price))
             #selecting a seller to buy from
             choice_seller =int(input("\nEnter the ID of the seller you would like to purchase from:\n"))
             sql_query = "select ps.price, ps.seller_id, ps.product_id\
@@ -48,11 +48,12 @@ def manage_product (choice_cat):
             choice_price_row = cursor.fetchone()
             choice_price = choice_price_row[0]
             choice_qty =int(input("\nEnter the quantity you would like to purchase:\n"))
-            print("Product " +str(choice_buy) + " from the seller " + str(choice_seller) +" at a price " +str(choice_price)+". Quantity: " + str(choice_qty))
+            print("Product " +str(choice_buy) + " from the seller " + str(choice_seller) +" at a price " +str(choice_price)+"£. Quantity: " + str(choice_qty))
+            #adding to basket
             add_to_basket = int(input("\nAdd to basket? Press 1. for Yes, 2. for No.\n"))
             if add_to_basket == 1:
                 try:
-                    
+                    #look for an active basket for that user
                     cursor.execute("PRAGMA foreign_keys=ON")
                     cursor.execute("select basket_id\
                     from shopper_baskets\
@@ -63,15 +64,28 @@ def manage_product (choice_cat):
                     
                     if active_basket:
                         active_basket_id= active_basket[0]
-                        #if the user has an active basket, use it to add new products
-                        sql_insert = "INSERT INTO basket_contents(basket_id, product_id, seller_id, quantity, price)\
-                                    VALUES(?,?,?,?,?)"
-                        cursor.execute(sql_insert,(active_basket_id, choice_buy, choice_seller, choice_qty, choice_price))
-                        print("\nAdded to basket.\n")
-                        db.commit()
+
+                        sql_query = "SELECT product_id\
+                            from basket_contents\
+                                where basket_id = ? and product_id = ?"
+                        cursor.execute(sql_query, (active_basket_id, choice_buy))
+                        rows = cursor.fetchone()
+                        # if a product is already in the active basket, update the quantity of it
+                        if rows:
+                            sql_query = "UPDATE basket_contents SET quantity = quantity+? WHERE basket_id= ? and product_id=?"
+                            cursor.execute(sql_query, (choice_qty, active_basket_id, choice_buy))
+                            db.commit()
+                            print("You already have this product in your basket. We've updated the quantity.")
+                        else:
+                            #add a new product to the active basket
+                            sql_insert = "INSERT INTO basket_contents(basket_id, product_id, seller_id, quantity, price)\
+                                        VALUES(?,?,?,?,?)"
+                            cursor.execute(sql_insert,(active_basket_id, choice_buy, choice_seller, choice_qty, choice_price))
+                            db.commit()
+                            print("\nAdded to basket.\n")
                         print("\nGoing back to the main menu...\n")
                     else:
-                    #create a new basket ID
+                    #if a user does not have an active basket, create a new basket ID
                         cursor.execute("select seq + 1 \
                             from sqlite_sequence \
                             WHERE name = 'shopper_baskets'")
@@ -82,8 +96,12 @@ def manage_product (choice_cat):
                         sql_insert = "INSERT INTO shopper_baskets(basket_id,shopper_id, basket_created_date_time)\
                                     VALUES (?,?,?)"
                         cursor.execute(sql_insert,(next_basket_id,shopper_id, todays_date))
-                        print("\nAdded to basket.\n")
+                        active_basket_id= seg_row[0]
+                        sql_insert = "INSERT INTO basket_contents(basket_id, product_id, seller_id, quantity, price)\
+                                    VALUES(?,?,?,?,?)"
+                        cursor.execute(sql_insert,(active_basket_id, choice_buy, choice_seller, choice_qty, choice_price))
                         db.commit()
+                        print("\nAdded to basket.\n")
                         print("\nGoing back to the main menu...\n")
                     run== False
                 except db.Error:
@@ -155,7 +173,7 @@ while run:
         all_choice_rows = cursor.fetchall()
         if all_choice_rows:
             print("Orders of the customer {0}:".format(shopper_id))
-            print("Order ID\tOrder date\tProduct Description \t\t\t\t\t\t\tSeller\t\t   Price\tQty\tStatus\n")
+            print("Order ID\tOrder date\tProduct Description \t\t\t\t\t\t\tSeller\t\t\tPrice\t\tQty\tStatus\n")
             for choice_row in all_choice_rows:
                 order_id = choice_row[0]
                 order_date = choice_row[1]
@@ -164,7 +182,7 @@ while run:
                 price = choice_row[4]
                 quantity = choice_row[5]
                 ordered_product_status = choice_row[6]
-                print("{0:8}\t{1:10}\t{2:70}\t{3:10}\t{4:9.2f}\t{5:3}\t{6:20}"\
+                print("{0:8}\t{1:10}\t{2:70}\t{3:10}\t\t£ {4:7.2f}\t{5:3}\t{6:20}"\
                     .format(order_id, order_date, product_description, seller_name, price, quantity, ordered_product_status))
             if_continue= input("Press 1 to go back to the main menu\n")
             if if_continue == 1:
@@ -220,7 +238,7 @@ while run:
 
         if active_basket:
             active_basket_id= active_basket[0]
-            sql_query= "select p.product_description, s.seller_name, bc.quantity, bc.price\
+            sql_query= "select p.product_description, s.seller_name, bc.quantity, ps.price\
                     from basket_contents bc\
                     left outer join product_sellers ps on bc.seller_id = ps.seller_id\
                     left outer join products p on  ps.product_id= p.product_id\
@@ -230,13 +248,13 @@ while run:
             cursor.execute(sql_query, (active_basket_id,))
             all_basket_rows = cursor.fetchall()
             if all_basket_rows:
-                print("Product Description\t\t\t\t\t\t\tSeller Name\t\tQty\t    Price\n")
+                print("Product Description\t\t\t\t\t\t\tSeller Name\t\tQty\t\tPrice\n")
                 for basket_row in all_basket_rows:
                     product_description = basket_row[0]
                     seller_name = basket_row[1]
                     quantity = basket_row[2]
                     price = basket_row[3]
-                    print("{0:70}\t{1:20}\t{2:4}\t{3:10}"\
+                    print("{0:70}\t{1:20}\t{2:4}\t\t£ {3:7.2f}"\
                         .format(product_description, seller_name, quantity, price))
                 if_continue= input("\nPress 1 to go back to the main menu:\n")
                 if if_continue == 1:
