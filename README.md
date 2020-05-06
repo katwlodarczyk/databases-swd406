@@ -1,2 +1,5 @@
 # databases-swd406
-introduction to databases SWD406
+Introduction to databases (SWD406)
+Solent University
+
+Database integration in Python coded program. 
